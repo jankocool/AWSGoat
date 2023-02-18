@@ -2,6 +2,14 @@ name: AWSGoat
 
 on:
   workflow_dispatch:
+    inputs:
+      module:
+        type: choice
+        description: "Select which module to deploy"
+        options: 
+        - module-1
+        - module-2
+        required: true
 
 jobs:
   deploy:
@@ -41,4 +49,4 @@ jobs:
 
     - name: Terraform destroy
       if: ${{ steps.apply.outcome == 'success' }}
-      run: terraform destroy -auto-approve
+      run: terraform destroy -var="module=${{ github.event.inputs.module }}" -auto-approve
