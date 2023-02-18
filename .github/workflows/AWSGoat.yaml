@@ -1,0 +1,44 @@
+name: AWSGoat
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 1.1.0
+
+    - name: Terraform init
+      run: terraform init
+
+    - name: Terraform apply
+      id: apply
+      timeout-minutes: 240
+      run: |
+        terraform apply -var="module=${{ github.event.inputs.module }}" -auto-approve
+        echo "::set-output name=timestamp::$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+    - name: Wait for 4 hours
+      if: ${{ steps.apply.outcome == 'success' }}
+      run: |
+        end_time=$(date -d "$(echo "${{ steps.apply.outputs.timestamp }}" | sed 's/ /T/') + 4 hours" '+%Y-%m-%dT%H:%M:%SZ')
+        while [ "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \< "$end_time" ]; do sleep 60; done
+
+    - name: Terraform destroy
+      if: ${{ steps.apply.outcome == 'success' }}
+      run: terraform destroy -auto-approve
